@@ -1,0 +1,13 @@
+{
+  "name": "@curra/domain-core",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "echo 'No tests yet for @curra/domain-core'",
+    "lint": "echo 'No lint configured yet for @curra/domain-core'"
+  }
+}

@@ -1,0 +1,144 @@
+{
+  "tenantId": "11111111-1111-1111-1111-111111111111",
+  "companyId": "22222222-2222-2222-2222-222222222222",
+  "periodId": "33333333-3333-3333-3333-333333333333",
+  "countryCode": "UG",
+  "currencyCode": "UGX",
+  "sourceWallet": "UGX",
+  "periodStart": "2026-02-01",
+  "periodEnd": "2026-02-28",
+  "employees": [
+    {
+      "employeeId": "emp-001",
+      "baseSalaryMinor": 2500000,
+      "taxableEarningsMinor": 0,
+      "additionalEarningsMinor": 0,
+      "payoutBeneficiaryName": "Vanessa Kiconco",
+      "payoutBeneficiaryAccount": "256700000001",
+      "payoutBeneficiaryCountryCode": "UG",
+      "payoutDestinationCountryCode": "UG",
+      "payoutDestinationNetwork": "mobile_money"
+    },
+    {
+      "employeeId": "emp-002",
+      "baseSalaryMinor": 2156923,
+      "taxableEarningsMinor": 0,
+      "additionalEarningsMinor": 0,
+      "payoutBeneficiaryName": "Joan Tinkasiimire Kebirungi",
+      "payoutBeneficiaryAccount": "256700000002",
+      "payoutBeneficiaryCountryCode": "UG",
+      "payoutDestinationCountryCode": "UG",
+      "payoutDestinationNetwork": "mobile_money"
+    },
+    {
+      "employeeId": "emp-003",
+      "baseSalaryMinor": 7541537,
+      "taxableEarningsMinor": 0,
+      "additionalEarningsMinor": 0,
+      "payoutBeneficiaryName": "Richard Maitum",
+      "payoutBeneficiaryAccount": "256700000003",
+      "payoutBeneficiaryCountryCode": "UG",
+      "payoutDestinationCountryCode": "UG",
+      "payoutDestinationNetwork": "mobile_money"
+    },
+    {
+      "employeeId": "emp-004",
+      "baseSalaryMinor": 4000000,
+      "taxableEarningsMinor": 0,
+      "additionalEarningsMinor": 0,
+      "payoutBeneficiaryName": "Ritah Namirumu",
+      "payoutBeneficiaryAccount": "256700000004",
+      "payoutBeneficiaryCountryCode": "UG",
+      "payoutDestinationCountryCode": "UG",
+      "payoutDestinationNetwork": "mobile_money"
+    },
+    {
+      "employeeId": "emp-005",
+      "baseSalaryMinor": 3940922,
+      "taxableEarningsMinor": 0,
+      "additionalEarningsMinor": 0,
+      "payoutBeneficiaryName": "Ambrose Tumuhimbise",
+      "payoutBeneficiaryAccount": "256700000005",
+      "payoutBeneficiaryCountryCode": "UG",
+      "payoutDestinationCountryCode": "UG",
+      "payoutDestinationNetwork": "mobile_money"
+    },
+    {
+      "employeeId": "emp-006",
+      "baseSalaryMinor": 1387691,
+      "taxableEarningsMinor": 0,
+      "additionalEarningsMinor": 0,
+      "payoutBeneficiaryName": "Elizabeth Atuheire",
+      "payoutBeneficiaryAccount": "256700000006",
+      "payoutBeneficiaryCountryCode": "UG",
+      "payoutDestinationCountryCode": "UG",
+      "payoutDestinationNetwork": "mobile_money"
+    },
+    {
+      "employeeId": "emp-007",
+      "baseSalaryMinor": 1219658,
+      "taxableEarningsMinor": 0,
+      "additionalEarningsMinor": 0,
+      "payoutBeneficiaryName": "Noeline Namugenyi",
+      "payoutBeneficiaryAccount": "256700000007",
+      "payoutBeneficiaryCountryCode": "UG",
+      "payoutDestinationCountryCode": "UG",
+      "payoutDestinationNetwork": "mobile_money"
+    },
+    {
+      "employeeId": "emp-008",
+      "baseSalaryMinor": 1079998,
+      "taxableEarningsMinor": 0,
+      "additionalEarningsMinor": 0,
+      "payoutBeneficiaryName": "Michelle Mugomba",
+      "payoutBeneficiaryAccount": "256700000008",
+      "payoutBeneficiaryCountryCode": "UG",
+      "payoutDestinationCountryCode": "UG",
+      "payoutDestinationNetwork": "mobile_money"
+    },
+    {
+      "employeeId": "emp-009",
+      "baseSalaryMinor": 2940000,
+      "taxableEarningsMinor": 0,
+      "additionalEarningsMinor": 0,
+      "payoutBeneficiaryName": "Allan Murungi Akugizibwe",
+      "payoutBeneficiaryAccount": "256700000009",
+      "payoutBeneficiaryCountryCode": "UG",
+      "payoutDestinationCountryCode": "UG",
+      "payoutDestinationNetwork": "mobile_money"
+    },
+    {
+      "employeeId": "emp-010",
+      "baseSalaryMinor": 2156923,
+      "taxableEarningsMinor": 0,
+      "additionalEarningsMinor": 0,
+      "payoutBeneficiaryName": "Andrew Abwango",
+      "payoutBeneficiaryAccount": "256700000010",
+      "payoutBeneficiaryCountryCode": "UG",
+      "payoutDestinationCountryCode": "UG",
+      "payoutDestinationNetwork": "mobile_money"
+    },
+    {
+      "employeeId": "emp-011",
+      "baseSalaryMinor": 5500000,
+      "taxableEarningsMinor": 0,
+      "additionalEarningsMinor": 0,
+      "payoutBeneficiaryName": "Andrew Kanyike",
+      "payoutBeneficiaryAccount": "256700000011",
+      "payoutBeneficiaryCountryCode": "UG",
+      "payoutDestinationCountryCode": "UG",
+      "payoutDestinationNetwork": "mobile_money"
+    },
+    {
+      "employeeId": "emp-012",
+      "baseSalaryMinor": 390666,
+      "taxableEarningsMinor": 0,
+      "additionalEarningsMinor": 0,
+      "payoutBeneficiaryName": "Atango Vera Patra",
+      "payoutBeneficiaryAccount": "256700000012",
+      "payoutBeneficiaryCountryCode": "UG",
+      "payoutDestinationCountryCode": "UG",
+      "payoutDestinationNetwork": "mobile_money"
+    }
+  ]
+}

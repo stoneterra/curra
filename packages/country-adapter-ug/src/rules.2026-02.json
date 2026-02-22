@@ -1,0 +1,25 @@
+{
+  "countryCode": "UG",
+  "adapterVersion": "2026.02.2",
+  "ruleSetId": "UG-PAYE-NSSF-2026-02",
+  "effectiveFrom": "2026-02-01",
+  "currencyCode": "UGX",
+  "paye": {
+    "basis": "monthly",
+    "bandsMinor": [
+      { "upToMinor": 23500000, "rateBps": 0, "baseTaxMinor": 0, "baseFloorMinor": 0 },
+      { "upToMinor": 33500000, "rateBps": 1000, "baseTaxMinor": 0, "baseFloorMinor": 23500000 },
+      { "upToMinor": 41000000, "rateBps": 2000, "baseTaxMinor": 1000000, "baseFloorMinor": 33500000 },
+      { "upToMinor": 1000000000, "rateBps": 3000, "baseTaxMinor": 2500000, "baseFloorMinor": 41000000 },
+      { "upToMinor": null, "rateBps": 4000, "baseTaxMinor": 290200000, "baseFloorMinor": 1000000000 }
+    ]
+  },
+  "nssf": {
+    "employeeRateBps": 500,
+    "employerRateBps": 1000
+  },
+  "remittance": {
+    "dayOfFollowingMonth": 15
+  }
+}
+

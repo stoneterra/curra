@@ -1,0 +1,16 @@
+{
+  "name": "@curra/country-adapter-ke",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "echo 'No tests yet for @curra/country-adapter-ke'",
+    "lint": "echo 'No lint configured yet for @curra/country-adapter-ke'"
+  },
+  "dependencies": {
+    "@curra/domain-core": "workspace:*"
+  }
+}
