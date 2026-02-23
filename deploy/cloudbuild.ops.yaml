@@ -1,0 +1,42 @@
+substitutions:
+  _REGION: us-central1
+  _AR_REPO: curra
+  _OPS_SERVICE: curra-ops
+  _OPS_IMAGE: curra-ops
+  _IMAGE_TAG: latest
+
+timeout: 1800s
+
+steps:
+  - id: build-ops-image
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - deploy/Dockerfile.ops
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_OPS_IMAGE}:${_IMAGE_TAG}
+      - .
+
+  - id: push-ops-image
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_OPS_IMAGE}:${_IMAGE_TAG}
+
+  - id: deploy-ops-service
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_OPS_SERVICE}
+      - --project=$PROJECT_ID
+      - --region=${_REGION}
+      - --platform=managed
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_OPS_IMAGE}:${_IMAGE_TAG}
+      - --allow-unauthenticated
+      - --port=8080
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_AR_REPO}/${_OPS_IMAGE}:${_IMAGE_TAG}

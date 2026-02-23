@@ -33,6 +33,35 @@ export interface NetPayDisbursementLineItem {
   idempotencyKey: string;
 }
 
+export interface EmployeePayrollBreakdown {
+  employeeId: string;
+  beneficiaryName: string;
+  grossMinor: number;
+  payeMinor: number;
+  employeeNssfMinor: number;
+  totalDeductionsMinor: number;
+  netMinor: number;
+  currencyCode: string;
+  payoutBeneficiaryAccount: string;
+  payoutDestinationNetwork: string;
+}
+
+export interface PayrollRunOutputs {
+  run: PayrollRunDraft;
+  grossTotalMinor: number;
+  deductionsTotalMinor: number;
+  netTotalMinor: number;
+  currencyCode: string;
+  sourceWallet: string;
+  employeeBreakdowns: EmployeePayrollBreakdown[];
+  remittanceInstructions: Array<{
+    authority: "URA" | "NSSF";
+    amountMinor: number;
+    currencyCode: string;
+    dueDate: string;
+  }>;
+}
+
 export class PayrollRunService {
   private readonly computeService: PayrollComputationService;
 
@@ -152,6 +181,62 @@ export class PayrollRunService {
 
   listByTenant(tenantId: string): Promise<PayrollRunDraft[]> {
     return this.repository.listByTenant(tenantId);
+  }
+
+  async getRunOutputs(payrollRunId: string): Promise<PayrollRunOutputs> {
+    const run = await this.repository.getById(payrollRunId);
+    if (!run) {
+      throw new Error("Payroll run not found.");
+    }
+
+    const computeInput: PayrollInput = {
+      tenantId: run.tenantId,
+      companyId: run.companyId,
+      payrollRunId: run.payrollRunId,
+      countryCode: run.countryCode,
+      currencyCode: run.currencyCode,
+      periodStart: run.periodStart,
+      periodEnd: run.periodEnd
+    };
+
+    const result = this.computeService.compute(computeInput, run.employees);
+    const selectedSourceWallet = run.sourceWallet?.trim() || run.currencyCode;
+
+    const employeeBreakdowns = run.employees.map((employee) => {
+      const grossMinor = employee.baseSalaryMinor + employee.taxableEarningsMinor + employee.additionalEarningsMinor;
+      const payeMinor = result.statutoryDeductions
+        .filter((line) => line.employeeId === employee.employeeId && line.deductionType === "PAYE")
+        .reduce((sum, line) => sum + line.amountMinor, 0);
+      const employeeNssfMinor = result.statutoryDeductions
+        .filter((line) => line.employeeId === employee.employeeId && line.deductionType === "NSSF")
+        .reduce((sum, line) => sum + line.amountMinor, 0);
+      const totalDeductionsMinor = payeMinor + employeeNssfMinor;
+      const netMinor = Math.max(0, grossMinor - totalDeductionsMinor);
+
+      return {
+        employeeId: employee.employeeId,
+        beneficiaryName: employee.payoutBeneficiaryName ?? employee.employeeId,
+        grossMinor,
+        payeMinor,
+        employeeNssfMinor,
+        totalDeductionsMinor,
+        netMinor,
+        currencyCode: run.currencyCode,
+        payoutBeneficiaryAccount: employee.payoutBeneficiaryAccount ?? "",
+        payoutDestinationNetwork: employee.payoutDestinationNetwork ?? "mobile_money"
+      };
+    });
+
+    return {
+      run,
+      grossTotalMinor: result.grossTotalMinor,
+      deductionsTotalMinor: result.deductionsTotalMinor,
+      netTotalMinor: result.netTotalMinor,
+      currencyCode: run.currencyCode,
+      sourceWallet: selectedSourceWallet,
+      employeeBreakdowns,
+      remittanceInstructions: result.remittanceInstructions
+    };
   }
 
   private buildDisbursementLineItems(

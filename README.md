@@ -32,3 +32,20 @@ See `/Users/stoneatwine/Curra Project/docs/STONE_INPUTS_REQUIRED.md`.
 ## Local setup
 
 See `/Users/stoneatwine/Curra Project/docs/LOCAL_SETUP.md`.
+
+## Operator frontend preview
+
+Thin operator frontend is available at:
+
+- `/Users/stoneatwine/Curra Project/services/curra-ops`
+
+Run locally:
+
+```bash
+cd "/Users/stoneatwine/Curra Project"
+pnpm --filter @curra/curra-ops dev
+```
+
+Default API target:
+
+- `https://curra-api-e3nk3kbbva-uc.a.run.app`
