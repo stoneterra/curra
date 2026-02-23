@@ -8,15 +8,15 @@ Authoritative operating standard:
 
 ## Current milestone
 
-Milestone 3 in progress: persisted payroll run API + ledger posting endpoint + outbox + Eversend worker scaffold.
+Milestone 4 in progress: Uganda payroll-first delivery (guided operator flow, immutable finalized snapshots, statutory/export pack).
 
-## Current status (2026-02-22)
+## Current status (2026-02-23)
 
 1. Workspace tooling installed and configured (Node 20, pnpm, PostgreSQL client).
 2. Monorepo typecheck and build are passing.
 3. API smoke-tested in memory mode (`/`, `/health`, payroll draft create/list, ledger accrual post).
-4. Payroll finalize intentionally blocked until Uganda statutory legal fixtures are approved and encoded.
-5. Invariant tests are active for `money` and `ledger` packages.
+4. Payroll finalize now stores immutable snapshot outputs (locked adapter/rule metadata).
+5. Golden fixture tests are active for Uganda (`Cogni Labs Feb 2026`) plus API invariants.
 
 ## Assumptions currently applied
 
@@ -49,3 +49,10 @@ pnpm --filter @curra/curra-ops dev
 Default API target:
 
 - `https://curra-api-e3nk3kbbva-uc.a.run.app`
+
+Primary payroll export endpoints:
+
+- `GET /payroll-runs/:payrollRunId/exports/payroll-register.csv`
+- `GET /payroll-runs/:payrollRunId/exports/paye-remittance.csv`
+- `GET /payroll-runs/:payrollRunId/exports/nssf-remittance.csv`
+- `GET /payroll-runs/:payrollRunId/exports/disbursement-instructions.csv`

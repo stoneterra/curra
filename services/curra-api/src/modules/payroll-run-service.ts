@@ -3,7 +3,12 @@ import { randomUUID } from "node:crypto";
 import { CountryAdapterRegistry } from "./country-adapter-registry.js";
 import { OutboxService } from "./outbox-service.js";
 import { PayrollComputationService } from "./payroll-computation-service.js";
-import type { PayrollRunRecord, PayrollRunRepository } from "../repositories/payroll-run-repository.js";
+import type {
+  PayrollEmployeeBreakdownSnapshot,
+  PayrollRunFinalizationSnapshot,
+  PayrollRunRecord,
+  PayrollRunRepository
+} from "../repositories/payroll-run-repository.js";
 
 export interface PayrollRunDraft {
   payrollRunId: string;
@@ -15,8 +20,11 @@ export interface PayrollRunDraft {
   sourceWallet?: string;
   periodStart: string;
   periodEnd: string;
+  employerTin?: string;
+  employerNssfCode?: string;
   employees: EmployeePayrollInput[];
   status: "draft" | "finalized";
+  finalizationSnapshot?: PayrollRunFinalizationSnapshot;
   createdAt: string;
 }
 
@@ -39,20 +47,35 @@ export interface EmployeePayrollBreakdown {
   grossMinor: number;
   payeMinor: number;
   employeeNssfMinor: number;
+  employerNssfMinor: number;
   totalDeductionsMinor: number;
   netMinor: number;
   currencyCode: string;
   payoutBeneficiaryAccount: string;
+  payoutBeneficiaryCountryCode: string;
+  payoutDestinationCountryCode: string;
   payoutDestinationNetwork: string;
 }
 
 export interface PayrollRunOutputs {
   run: PayrollRunDraft;
+  computedAt: string;
+  mode: "draft_recompute" | "finalized_snapshot";
+  adapterMetadata: {
+    countryCode: string;
+    adapterVersion: string;
+    ruleSetId: string;
+    effectiveFrom: string;
+  };
   grossTotalMinor: number;
   deductionsTotalMinor: number;
   netTotalMinor: number;
   currencyCode: string;
   sourceWallet: string;
+  payeTotalMinor: number;
+  employeeNssfTotalMinor: number;
+  employerNssfTotalMinor: number;
+  validationWarnings: string[];
   employeeBreakdowns: EmployeePayrollBreakdown[];
   remittanceInstructions: Array<{
     authority: "URA" | "NSSF";
@@ -112,8 +135,16 @@ export class PayrollRunService {
     };
 
     if (draft.status === "finalized") {
-      const replayResult = this.computeService.compute(computeInput, draft.employees);
-      const replayLineItems = this.buildDisbursementLineItems(draft, replayResult.statutoryDeductions);
+      const replayCompute = this.computeService.compute(computeInput, draft.employees);
+      const replaySnapshot =
+        draft.finalizationSnapshot ??
+        this.buildFinalizationSnapshot(
+          draft,
+          replayCompute,
+          selectedSourceWallet,
+          this.buildValidationWarnings(draft, replayCompute.netTotalMinor)
+        );
+      const replayLineItems = this.buildDisbursementLineItems(draft, replaySnapshot.employeeBreakdowns);
 
       await this.outbox.enqueue({
         eventId: randomUUID(),
@@ -132,8 +163,8 @@ export class PayrollRunService {
         tenantId: draft.tenantId,
         payrollRunId: draft.payrollRunId,
         status: "finalized",
-        grossTotalMinor: replayResult.grossTotalMinor,
-        netTotalMinor: replayResult.netTotalMinor,
+        grossTotalMinor: replaySnapshot.grossTotalMinor,
+        netTotalMinor: replaySnapshot.netTotalMinor,
         currencyCode: draft.currencyCode,
         sourceWallet: selectedSourceWallet,
         disbursementLineItems: replayLineItems
@@ -141,8 +172,15 @@ export class PayrollRunService {
     }
 
     const result = this.computeService.compute(computeInput, draft.employees);
-    const disbursementLineItems = this.buildDisbursementLineItems(draft, result.statutoryDeductions);
-    await this.repository.markFinalized(payrollRunId);
+    const warnings = this.buildValidationWarnings(draft, result.netTotalMinor);
+    const finalizationSnapshot = this.buildFinalizationSnapshot(
+      draft,
+      result,
+      selectedSourceWallet,
+      warnings
+    );
+    const disbursementLineItems = this.buildDisbursementLineItems(draft, finalizationSnapshot.employeeBreakdowns);
+    await this.repository.markFinalized(payrollRunId, finalizationSnapshot);
 
     await this.outbox.enqueue({
       eventId: randomUUID(),
@@ -189,6 +227,10 @@ export class PayrollRunService {
       throw new Error("Payroll run not found.");
     }
 
+    if (run.status === "finalized" && run.finalizationSnapshot) {
+      return this.toOutputsFromSnapshot(run, run.finalizationSnapshot);
+    }
+
     const computeInput: PayrollInput = {
       tenantId: run.tenantId,
       companyId: run.companyId,
@@ -201,14 +243,72 @@ export class PayrollRunService {
 
     const result = this.computeService.compute(computeInput, run.employees);
     const selectedSourceWallet = run.sourceWallet?.trim() || run.currencyCode;
+    const warnings = this.buildValidationWarnings(run, result.netTotalMinor);
+    const draftSnapshot = this.buildFinalizationSnapshot(run, result, selectedSourceWallet, warnings);
 
-    const employeeBreakdowns = run.employees.map((employee) => {
+    return {
+      run,
+      computedAt: draftSnapshot.computedAt,
+      mode: "draft_recompute",
+      adapterMetadata: draftSnapshot.adapterMetadata,
+      grossTotalMinor: draftSnapshot.grossTotalMinor,
+      deductionsTotalMinor: draftSnapshot.deductionsTotalMinor,
+      netTotalMinor: draftSnapshot.netTotalMinor,
+      currencyCode: draftSnapshot.currencyCode,
+      sourceWallet: draftSnapshot.sourceWallet,
+      payeTotalMinor: draftSnapshot.payeTotalMinor,
+      employeeNssfTotalMinor: draftSnapshot.employeeNssfTotalMinor,
+      employerNssfTotalMinor: draftSnapshot.employerNssfTotalMinor,
+      validationWarnings: draftSnapshot.validationWarnings,
+      employeeBreakdowns: draftSnapshot.employeeBreakdowns,
+      remittanceInstructions: draftSnapshot.remittanceInstructions
+    };
+  }
+
+  private buildDisbursementLineItems(
+    run: PayrollRunDraft,
+    employeeBreakdowns: Array<{
+      employeeId: string;
+      beneficiaryName: string;
+      netMinor: number;
+      payoutBeneficiaryAccount: string;
+      payoutBeneficiaryCountryCode: string;
+      payoutDestinationCountryCode: string;
+      payoutDestinationNetwork: string;
+    }>
+  ): NetPayDisbursementLineItem[] {
+    return employeeBreakdowns.map((line) => {
+      return {
+        employeeId: line.employeeId,
+        beneficiaryName: line.beneficiaryName,
+        beneficiaryAccount: line.payoutBeneficiaryAccount,
+        beneficiaryCountryCode: line.payoutBeneficiaryCountryCode,
+        destinationCountryCode: line.payoutDestinationCountryCode,
+        destinationNetwork: line.payoutDestinationNetwork,
+        amountMinor: line.netMinor,
+        currencyCode: run.currencyCode,
+        reference: `PAYROLL-${run.payrollRunId}-${line.employeeId}`,
+        idempotencyKey: `${run.payrollRunId}:${line.employeeId}:netpay:v1`
+      };
+    });
+  }
+
+  private buildFinalizationSnapshot(
+    run: PayrollRunDraft,
+    result: ReturnType<PayrollComputationService["compute"]>,
+    sourceWallet: string,
+    validationWarnings: string[]
+  ): PayrollRunFinalizationSnapshot {
+    const employeeBreakdowns: PayrollEmployeeBreakdownSnapshot[] = run.employees.map((employee) => {
       const grossMinor = employee.baseSalaryMinor + employee.taxableEarningsMinor + employee.additionalEarningsMinor;
       const payeMinor = result.statutoryDeductions
         .filter((line) => line.employeeId === employee.employeeId && line.deductionType === "PAYE")
         .reduce((sum, line) => sum + line.amountMinor, 0);
       const employeeNssfMinor = result.statutoryDeductions
         .filter((line) => line.employeeId === employee.employeeId && line.deductionType === "NSSF")
+        .reduce((sum, line) => sum + line.amountMinor, 0);
+      const employerNssfMinor = result.employerContributions
+        .filter((line) => line.employeeId === employee.employeeId && line.contributionType === "NSSF")
         .reduce((sum, line) => sum + line.amountMinor, 0);
       const totalDeductionsMinor = payeMinor + employeeNssfMinor;
       const netMinor = Math.max(0, grossMinor - totalDeductionsMinor);
@@ -219,49 +319,74 @@ export class PayrollRunService {
         grossMinor,
         payeMinor,
         employeeNssfMinor,
+        employerNssfMinor,
         totalDeductionsMinor,
         netMinor,
         currencyCode: run.currencyCode,
         payoutBeneficiaryAccount: employee.payoutBeneficiaryAccount ?? "",
+        payoutBeneficiaryCountryCode: employee.payoutBeneficiaryCountryCode ?? "UG",
+        payoutDestinationCountryCode: employee.payoutDestinationCountryCode ?? "UG",
         payoutDestinationNetwork: employee.payoutDestinationNetwork ?? "mobile_money"
       };
     });
 
     return {
-      run,
+      computedAt: new Date().toISOString(),
+      adapterMetadata: {
+        countryCode: result.adapterMetadata.countryCode,
+        adapterVersion: result.adapterMetadata.adapterVersion,
+        ruleSetId: result.adapterMetadata.ruleSetId,
+        effectiveFrom: result.adapterMetadata.effectiveFrom
+      },
       grossTotalMinor: result.grossTotalMinor,
       deductionsTotalMinor: result.deductionsTotalMinor,
       netTotalMinor: result.netTotalMinor,
       currencyCode: run.currencyCode,
-      sourceWallet: selectedSourceWallet,
+      sourceWallet,
+      payeTotalMinor: employeeBreakdowns.reduce((sum, line) => sum + line.payeMinor, 0),
+      employeeNssfTotalMinor: employeeBreakdowns.reduce((sum, line) => sum + line.employeeNssfMinor, 0),
+      employerNssfTotalMinor: employeeBreakdowns.reduce((sum, line) => sum + line.employerNssfMinor, 0),
       employeeBreakdowns,
-      remittanceInstructions: result.remittanceInstructions
+      remittanceInstructions: result.remittanceInstructions,
+      validationWarnings
     };
   }
 
-  private buildDisbursementLineItems(
-    draft: PayrollRunDraft,
-    statutoryDeductions: Array<{ employeeId: string; amountMinor: number }>
-  ): NetPayDisbursementLineItem[] {
-    return draft.employees.map((employee) => {
-      const grossMinor = employee.baseSalaryMinor + employee.taxableEarningsMinor + employee.additionalEarningsMinor;
-      const deductionsMinor = statutoryDeductions
-        .filter((line) => line.employeeId === employee.employeeId)
-        .reduce((sum, line) => sum + line.amountMinor, 0);
-      const netMinor = Math.max(0, grossMinor - deductionsMinor);
+  private toOutputsFromSnapshot(run: PayrollRunDraft, snapshot: PayrollRunFinalizationSnapshot): PayrollRunOutputs {
+    return {
+      run,
+      computedAt: snapshot.computedAt,
+      mode: "finalized_snapshot",
+      adapterMetadata: snapshot.adapterMetadata,
+      grossTotalMinor: snapshot.grossTotalMinor,
+      deductionsTotalMinor: snapshot.deductionsTotalMinor,
+      netTotalMinor: snapshot.netTotalMinor,
+      currencyCode: snapshot.currencyCode,
+      sourceWallet: snapshot.sourceWallet,
+      payeTotalMinor: snapshot.payeTotalMinor,
+      employeeNssfTotalMinor: snapshot.employeeNssfTotalMinor,
+      employerNssfTotalMinor: snapshot.employerNssfTotalMinor,
+      validationWarnings: snapshot.validationWarnings,
+      employeeBreakdowns: snapshot.employeeBreakdowns,
+      remittanceInstructions: snapshot.remittanceInstructions
+    };
+  }
 
-      return {
-        employeeId: employee.employeeId,
-        beneficiaryName: employee.payoutBeneficiaryName ?? employee.employeeId,
-        beneficiaryAccount: employee.payoutBeneficiaryAccount ?? "",
-        beneficiaryCountryCode: employee.payoutBeneficiaryCountryCode ?? "UG",
-        destinationCountryCode: employee.payoutDestinationCountryCode ?? "UG",
-        destinationNetwork: employee.payoutDestinationNetwork ?? "mobile_money",
-        amountMinor: netMinor,
-        currencyCode: draft.currencyCode,
-        reference: `PAYROLL-${draft.payrollRunId}-${employee.employeeId}`,
-        idempotencyKey: `${draft.payrollRunId}:${employee.employeeId}:netpay:v1`
-      };
-    });
+  private buildValidationWarnings(run: PayrollRunDraft, netTotalMinor: number): string[] {
+    const warnings: string[] = [];
+    if (!run.employerTin?.trim()) {
+      warnings.push("Missing employer TIN.");
+    }
+    if (!run.employerNssfCode?.trim()) {
+      warnings.push("Missing employer NSSF code.");
+    }
+    if (netTotalMinor <= 0) {
+      warnings.push("Run net pay is zero or negative.");
+    }
+    const inactiveEmployees = run.employees.filter((employee) => employee.employmentStatus?.toLowerCase() === "inactive");
+    if (inactiveEmployees.length > 0) {
+      warnings.push(`Inactive employees included: ${inactiveEmployees.length}.`);
+    }
+    return warnings;
   }
 }

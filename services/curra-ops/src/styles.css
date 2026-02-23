@@ -153,6 +153,12 @@ button:disabled {
   border: 1px solid #f8c6c6;
 }
 
+.muted {
+  font-size: 13px;
+  color: #475569;
+  margin: 0;
+}
+
 @media (max-width: 980px) {
   .layout {
     grid-template-columns: 1fr;

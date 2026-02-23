@@ -20,6 +20,7 @@ export interface PayrollInput {
 
 export interface EmployeePayrollInput {
   employeeId: string;
+  employmentStatus?: "active" | "inactive";
   baseSalaryMinor: MinorUnit;
   taxableEarningsMinor: MinorUnit;
   additionalEarningsMinor: MinorUnit;

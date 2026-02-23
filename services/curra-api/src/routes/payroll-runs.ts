@@ -39,11 +39,14 @@ export const payrollRunsRoute: FastifyPluginAsync = async (app) => {
       sourceWallet?: string;
       periodStart: string;
       periodEnd: string;
+      employerTin?: string;
+      employerNssfCode?: string;
       employees: Array<{
         employeeId: string;
         baseSalaryMinor: number;
         taxableEarningsMinor: number;
         additionalEarningsMinor: number;
+        employmentStatus?: "active" | "inactive";
         payoutBeneficiaryName?: string;
         payoutBeneficiaryAccount?: string;
         payoutBeneficiaryCountryCode?: string;
@@ -173,6 +176,7 @@ export const payrollRunsRoute: FastifyPluginAsync = async (app) => {
         <tr><td>Gross Pay</td><td>${payslip.grossMinor}</td></tr>
         <tr><td>PAYE</td><td>${payslip.payeMinor}</td></tr>
         <tr><td>NSSF Employee</td><td>${payslip.employeeNssfMinor}</td></tr>
+        <tr><td>NSSF Employer</td><td>${payslip.employerNssfMinor}</td></tr>
         <tr><td>Total Deductions</td><td>${payslip.totalDeductionsMinor}</td></tr>
         <tr class="net"><td>Net Pay</td><td>${payslip.netMinor}</td></tr>
       </table>
@@ -209,6 +213,7 @@ export const payrollRunsRoute: FastifyPluginAsync = async (app) => {
         gross_minor: line.grossMinor,
         paye_minor: line.payeMinor,
         nssf_employee_minor: line.employeeNssfMinor,
+        nssf_employer_minor: line.employerNssfMinor,
         deductions_total_minor: line.totalDeductionsMinor,
         net_minor: line.netMinor
       }));
@@ -259,6 +264,13 @@ export const payrollRunsRoute: FastifyPluginAsync = async (app) => {
           amount_minor: authorityTotals.NSSF,
           currency: output.currencyCode,
           due_date: ""
+        },
+        {
+          payroll_run_id: output.run.payrollRunId,
+          authority: "NSSF_EMPLOYER_ONLY",
+          amount_minor: output.employerNssfTotalMinor,
+          currency: output.currencyCode,
+          due_date: ""
         }
       ];
       const csv = toCsv(rows);
@@ -283,6 +295,8 @@ export const payrollRunsRoute: FastifyPluginAsync = async (app) => {
         employee_id: line.employeeId,
         beneficiary_name: line.beneficiaryName,
         beneficiary_account: line.payoutBeneficiaryAccount,
+        beneficiary_country_code: line.payoutBeneficiaryCountryCode,
+        destination_country_code: line.payoutDestinationCountryCode,
         destination_network: line.payoutDestinationNetwork,
         net_amount_minor: line.netMinor,
         payout_currency: line.currencyCode,
@@ -297,6 +311,63 @@ export const payrollRunsRoute: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({
         error: "DISBURSEMENT_EXPORT_NOT_AVAILABLE",
         message: error instanceof Error ? error.message : "Unknown disbursement export error."
+      });
+    }
+  });
+
+  app.get("/:payrollRunId/exports/paye-remittance.csv", async (request, reply) => {
+    const params = request.params as { payrollRunId: string };
+    try {
+      const output = await payrollRunService.getRunOutputs(params.payrollRunId);
+      const instruction = output.remittanceInstructions.find((line) => line.authority === "URA");
+      const rows = [
+        {
+          payroll_run_id: output.run.payrollRunId,
+          authority: "URA",
+          deduction_type: "PAYE",
+          amount_minor: output.payeTotalMinor,
+          currency: output.currencyCode,
+          due_date: instruction?.dueDate ?? "",
+          employer_tin: output.run.employerTin ?? ""
+        }
+      ];
+      return reply
+        .header("content-type", "text/csv; charset=utf-8")
+        .header("content-disposition", `attachment; filename="paye-remittance-${params.payrollRunId}.csv"`)
+        .send(toCsv(rows));
+    } catch (error) {
+      return reply.code(404).send({
+        error: "PAYE_EXPORT_NOT_AVAILABLE",
+        message: error instanceof Error ? error.message : "Unknown PAYE export error."
+      });
+    }
+  });
+
+  app.get("/:payrollRunId/exports/nssf-remittance.csv", async (request, reply) => {
+    const params = request.params as { payrollRunId: string };
+    try {
+      const output = await payrollRunService.getRunOutputs(params.payrollRunId);
+      const instruction = output.remittanceInstructions.find((line) => line.authority === "NSSF");
+      const rows = [
+        {
+          payroll_run_id: output.run.payrollRunId,
+          authority: "NSSF",
+          employee_amount_minor: output.employeeNssfTotalMinor,
+          employer_amount_minor: output.employerNssfTotalMinor,
+          total_amount_minor: output.employeeNssfTotalMinor + output.employerNssfTotalMinor,
+          currency: output.currencyCode,
+          due_date: instruction?.dueDate ?? "",
+          employer_nssf_code: output.run.employerNssfCode ?? ""
+        }
+      ];
+      return reply
+        .header("content-type", "text/csv; charset=utf-8")
+        .header("content-disposition", `attachment; filename="nssf-remittance-${params.payrollRunId}.csv"`)
+        .send(toCsv(rows));
+    } catch (error) {
+      return reply.code(404).send({
+        error: "NSSF_EXPORT_NOT_AVAILABLE",
+        message: error instanceof Error ? error.message : "Unknown NSSF export error."
       });
     }
   });

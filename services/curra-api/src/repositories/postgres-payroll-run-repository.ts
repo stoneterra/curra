@@ -1,5 +1,9 @@
 import type { DbClient } from "../db/types.js";
-import type { PayrollRunRecord, PayrollRunRepository } from "./payroll-run-repository.js";
+import type {
+  PayrollRunFinalizationSnapshot,
+  PayrollRunRecord,
+  PayrollRunRepository
+} from "./payroll-run-repository.js";
 
 interface PayrollRunRow {
   id: string;
@@ -14,7 +18,10 @@ interface PayrollRunRow {
     sourceWallet?: string;
     periodStart: string;
     periodEnd: string;
+    employerTin?: string;
+    employerNssfCode?: string;
     employees: PayrollRunRecord["employees"];
+    finalizationSnapshot?: PayrollRunFinalizationSnapshot;
   };
 }
 
@@ -48,6 +55,8 @@ export class PostgresPayrollRunRepository implements PayrollRunRepository {
           sourceWallet: input.sourceWallet,
           periodStart: input.periodStart,
           periodEnd: input.periodEnd,
+          employerTin: input.employerTin,
+          employerNssfCode: input.employerNssfCode,
           employees: input.employees
         })
       ]
@@ -68,6 +77,8 @@ export class PostgresPayrollRunRepository implements PayrollRunRepository {
       ...(input.sourceWallet ? { sourceWallet: input.sourceWallet } : {}),
       periodStart: input.periodStart,
       periodEnd: input.periodEnd,
+      ...(input.employerTin ? { employerTin: input.employerTin } : {}),
+      ...(input.employerNssfCode ? { employerNssfCode: input.employerNssfCode } : {}),
       employees: input.employees,
       status: created.status,
       createdAt: created.created_at
@@ -99,20 +110,39 @@ export class PostgresPayrollRunRepository implements PayrollRunRepository {
       ...(row.metadata_json.sourceWallet ? { sourceWallet: row.metadata_json.sourceWallet } : {}),
       periodStart: row.metadata_json.periodStart,
       periodEnd: row.metadata_json.periodEnd,
+      ...(row.metadata_json.employerTin ? { employerTin: row.metadata_json.employerTin } : {}),
+      ...(row.metadata_json.employerNssfCode ? { employerNssfCode: row.metadata_json.employerNssfCode } : {}),
       employees: row.metadata_json.employees,
       status: row.status,
+      ...(row.metadata_json.finalizationSnapshot ? { finalizationSnapshot: row.metadata_json.finalizationSnapshot } : {}),
       createdAt: row.created_at
     };
   }
 
-  async markFinalized(payrollRunId: string): Promise<void> {
+  async markFinalized(payrollRunId: string, snapshot: PayrollRunFinalizationSnapshot): Promise<void> {
     await this.db.query(
       `
       UPDATE payroll_runs
-      SET status = 'finalized', updated_at = now()
+      SET
+        status = 'finalized',
+        adapter_version = $2,
+        rule_set_id = $3,
+        gross_total_minor = $4,
+        net_total_minor = $5,
+        statutory_total_minor = $6,
+        metadata_json = jsonb_set(COALESCE(metadata_json, '{}'::jsonb), '{finalizationSnapshot}', $7::jsonb, true),
+        updated_at = now()
       WHERE id = $1
       `,
-      [payrollRunId]
+      [
+        payrollRunId,
+        snapshot.adapterMetadata.adapterVersion,
+        snapshot.adapterMetadata.ruleSetId,
+        snapshot.grossTotalMinor,
+        snapshot.netTotalMinor,
+        snapshot.deductionsTotalMinor,
+        JSON.stringify(snapshot)
+      ]
     );
   }
 
@@ -137,8 +167,11 @@ export class PostgresPayrollRunRepository implements PayrollRunRepository {
       ...(row.metadata_json.sourceWallet ? { sourceWallet: row.metadata_json.sourceWallet } : {}),
       periodStart: row.metadata_json.periodStart,
       periodEnd: row.metadata_json.periodEnd,
+      ...(row.metadata_json.employerTin ? { employerTin: row.metadata_json.employerTin } : {}),
+      ...(row.metadata_json.employerNssfCode ? { employerNssfCode: row.metadata_json.employerNssfCode } : {}),
       employees: row.metadata_json.employees,
       status: row.status,
+      ...(row.metadata_json.finalizationSnapshot ? { finalizationSnapshot: row.metadata_json.finalizationSnapshot } : {}),
       createdAt: row.created_at
     }));
   }
